@@ -1,7 +1,7 @@
 <?php
 /**
  * Changelog:
- * Version 1.0.0d - Ajout d'un filtre par catégories et d'un code couleur pour les statuts des articles.
+ * Version 1.0.0i - Correction de la requête pour inclure explicitement tous les statuts d'articles (publish, future, draft, pending).
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -167,18 +167,22 @@ function generate_scheduled_posts_calendar_alpha() {
                                 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
             document.getElementById('currentMonth').textContent = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 
-            // Récupération des articles publiés
-            fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?status=publish&per_page=100&orderby=date&order=desc`, {
+            // Récupération de tous les articles avec tous les statuts
+            fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future,draft,pending&orderby=date&order=desc`, {
                 headers: {
                     'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                 }
             })
             .then(response => response.json())
             .then(posts => {
+                console.log('Posts récupérés:', posts); // Pour le débogage
                 const categoryFilter = document.getElementById('categoryFilter').value;
                 const filteredPosts = categoryFilter ? posts.filter(post => post.categories.includes(parseInt(categoryFilter))) : posts;
                 generateCalendarGrid(firstDay, lastDay, filteredPosts);
                 updateMonthlyStats(filteredPosts, date.getFullYear(), date.getMonth());
+            })
+            .catch(error => {
+                console.error('Erreur lors de la récupération des articles:', error);
             });
         }
 
