@@ -40,8 +40,8 @@ function scheduled_posts_calendar_styles_alpha() {
     ?>
     <style>
         .calendar-container {
-            max-width: 1200px;
-            margin: 20px auto;
+            max-width: 100%;
+            margin: 20px 0;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
         }
         .calendar-header {
@@ -115,6 +115,11 @@ function scheduled_posts_calendar_styles_alpha() {
         }
         .calendar-day.empty {
             background: #f8f9fa;
+            opacity: 0.7;
+            color: #999;
+        }
+        .calendar-day.empty .date {
+            color: #999;
         }
         .calendar-day .date {
             font-weight: bold;
@@ -432,8 +437,8 @@ function generate_scheduled_posts_calendar_alpha() {
                     ?>
                 </select>
                 <div class="calendar-stats">
-                    <span title="Total des articles de l'année"><i class="dashicons dashicons-archive"></i> <span id="totalYearPosts" class="count">0</span></span>
-                    <span title="Articles du mois en cours"><i class="dashicons dashicons-portfolio"></i> <span id="totalMonthPosts" class="count">0</span></span>
+                    <span title="Total des articles de l'année"><i class="dashicons dashicons-calendar-alt"></i> <span id="totalYearPosts" class="count">0</span></span>
+                    <span title="Articles du mois en cours"><i class="dashicons dashicons-calendar"></i> <span id="totalMonthPosts" class="count">0</span></span>
                     <span title="Moyenne mensuelle"><i class="dashicons dashicons-chart-area"></i> <span id="avgPostsPerMonth" class="count">0</span></span>
                 </div>
             </div>
@@ -493,11 +498,17 @@ function generate_scheduled_posts_calendar_alpha() {
                 grid.appendChild(dayHeader);
             });
 
-            // Ajout des cases vides pour le début du mois
+            // Ajout des cases vides pour le début du mois avec les jours du mois précédent
             const emptyDaysStart = (firstDay.getDay() || 7) - 1;
+            const prevMonthLastDay = new Date(firstDay.getFullYear(), firstDay.getMonth(), 0).getDate();
+            
             for (let i = 0; i < emptyDaysStart; i++) {
                 const emptyDay = document.createElement('div');
                 emptyDay.className = 'calendar-day empty';
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date';
+                dateDiv.textContent = prevMonthLastDay - emptyDaysStart + i + 1;
+                emptyDay.appendChild(dateDiv);
                 grid.appendChild(emptyDay);
             }
 
@@ -559,6 +570,20 @@ function generate_scheduled_posts_calendar_alpha() {
                 });
 
                 grid.appendChild(dayCell);
+            }
+
+            // Ajout des cases vides pour la fin du mois avec les jours du mois suivant
+            const totalDays = emptyDaysStart + lastDay.getDate();
+            const emptyDaysEnd = Math.ceil(totalDays / 7) * 7 - totalDays;
+            
+            for (let i = 1; i <= emptyDaysEnd; i++) {
+                const emptyDay = document.createElement('div');
+                emptyDay.className = 'calendar-day empty';
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date';
+                dateDiv.textContent = i;
+                emptyDay.appendChild(dateDiv);
+                grid.appendChild(emptyDay);
             }
 
             // Initialisation du drag & drop après la génération du calendrier
