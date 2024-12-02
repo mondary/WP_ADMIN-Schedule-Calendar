@@ -1,14 +1,26 @@
 <?php
 /**
  * Changelog:
- * Version 1.0.0j - Ajout des brouillons dans la requête et mise à jour des couleurs.
+ * v1.0 "Le Petit Calendrier" - Premier jet du calendrier
+ * v1.1 "Le Chasseur d'Articles" - Récupération de tous les articles avec pagination
+ * v1.2 "Le Débuggeur Fou" - Ajout de la gestion des erreurs
+ * v1.3 "Le Filtreur Magique" - Ajout du filtre par catégories
+ * v1.4 "L'Explorateur Temporel" - Modification pour inclure tous les articles
+ * v1.5 "Le Prophète" - Correction pour les articles programmés
+ * v1.6 "Retour vers le Futur" - Inclusion des articles des jours à venir
+ * v1.7 "Le Maître du Temps" - Amélioration de l'affichage des articles programmés
+ * v1.8 "Le Grand Rassembleur" - Inclusion de tous les statuts d'articles
+ * v1.9 "Le Brouillon Farceur" - Ajout des brouillons et mise à jour des couleurs
+ * v2.0 "L'Arc-en-Ciel" - Harmonisation des couleurs entre les vues
+ * v2.1 "Le Minimaliste" - Simplification du menu et historique complet
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
 if (!defined('ABSPATH')) exit;
 
-// Ajout du style CSS
+// Ajout du style CSS pour le calendrier et la liste d'articles
 function scheduled_posts_calendar_styles_alpha() {
+    $screen = get_current_screen();
     ?>
     <style>
         .calendar-container {
@@ -80,17 +92,21 @@ function scheduled_posts_calendar_styles_alpha() {
             cursor: pointer;
             transition: background 0.2s ease;
         }
-        .post-item.publish {
-            background: #d4edda; /* Vert clair pour les articles publiés */
+        .post-item.publish,
+        .status-publish {
+            background: #d4edda !important; /* Vert clair pour les articles publiés */
         }
-        .post-item.draft {
-            background: #ffe5d9; /* Orange clair pour les brouillons */
+        .post-item.draft,
+        .status-draft {
+            background: #ffe5d9 !important; /* Orange clair pour les brouillons */
         }
-        .post-item.pending {
-            background: #ffeeba; /* Jaune pour les articles en attente */
+        .post-item.pending,
+        .status-pending {
+            background: #ffeeba !important; /* Jaune pour les articles en attente */
         }
-        .post-item.future {
-            background: #cce5ff; /* Bleu clair pour les articles planifiés */
+        .post-item.future,
+        .status-future {
+            background: #cce5ff !important; /* Bleu clair pour les articles planifiés */
         }
         .today {
             border: 2px solid #2271b1;
@@ -112,9 +128,44 @@ function scheduled_posts_calendar_styles_alpha() {
         .monthly-stats li span {
             font-weight: bold;
         }
+
+        /* Styles spécifiques pour la liste d'articles */
+        .wp-list-table tr.status-publish {
+            background: #d4edda !important;
+        }
+        .wp-list-table tr.status-draft {
+            background: #ffe5d9 !important;
+        }
+        .wp-list-table tr.status-pending {
+            background: #ffeeba !important;
+        }
+        .wp-list-table tr.status-future {
+            background: #cce5ff !important;
+        }
+
+        /* Hover states pour la liste d'articles */
+        .wp-list-table tr.status-publish:hover {
+            background: #c3e6cb !important;
+        }
+        .wp-list-table tr.status-draft:hover {
+            background: #ffd5c2 !important;
+        }
+        .wp-list-table tr.status-pending:hover {
+            background: #ffe7a0 !important;
+        }
+        .wp-list-table tr.status-future:hover {
+            background: #b8daff !important;
+        }
+
+        /* S'assurer que le texte reste lisible */
+        .wp-list-table tr td {
+            color: #000 !important;
+        }
     </style>
     <?php
 }
+
+// Ajouter les styles à l'administration
 add_action('admin_head', 'scheduled_posts_calendar_styles_alpha');
 
 // Fonction pour générer le HTML du calendrier
@@ -306,6 +357,6 @@ function generate_scheduled_posts_calendar_alpha() {
 
 // Ajout de la page du calendrier au menu admin
 add_action('admin_menu', function() {
-    add_menu_page('Calendrier des Articles', 'Calendrier Articles', 'edit_posts', 'scheduled-posts-calendar', 'generate_scheduled_posts_calendar_alpha', 'dashicons-calendar-alt', 6);
+    add_menu_page('Calendrier des Articles', 'Calendrier', 'edit_posts', 'scheduled-posts-calendar', 'generate_scheduled_posts_calendar_alpha', 'dashicons-calendar-alt', 6);
 });
 ?>
