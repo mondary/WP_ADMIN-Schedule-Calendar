@@ -19,6 +19,8 @@
  * v2.5 "L'Esthète" - Refonte des tuiles articles et amélioration du drag & drop
  * v2.6 "Le Perfectionniste" - Correction du drag & drop et stabilisation des icônes
  * v2.7 "Le Navigateur" - Ajout du raccourci dans la barre d'administration
+ * v2.8 "Le Simplificateur" - Suppression du drag & drop et réorganisation des tuiles
+ * v2.9 "L'Organisateur" - Refonte du header avec sélection directe des dates
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -42,30 +44,42 @@ function scheduled_posts_calendar_styles_alpha() {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
         }
         .calendar-header {
-            display: flex;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 12px;
             align-items: center;
-            margin-bottom: 20px;
-            padding: 10px;
             background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .calendar-nav {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            align-items: center;
+        }
+        .calendar-nav select {
+            padding: 4px 24px 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="%23999"><path d="M6 9L1 4h10z"/></svg>') no-repeat right 8px center;
         }
         .calendar-nav button {
-            padding: 8px 15px;
-            border: none;
-            background: #2271b1;
-            color: white;
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #666;
             border-radius: 4px;
             cursor: pointer;
-            transition: background 0.3s ease;
+            font-size: 13px;
         }
         .calendar-nav button:hover {
-            background: #135e96;
+            background: #f0f0f1;
+            border-color: #999;
         }
         .calendar-grid {
             display: grid;
@@ -180,17 +194,60 @@ function scheduled_posts_calendar_styles_alpha() {
 
         /* Styles pour la barre de recherche */
         .calendar-search {
-            margin: 10px 0;
-            padding: 10px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            position: relative;
+            margin: 0;
+            padding: 0;
         }
         .calendar-search input {
             width: 100%;
-            padding: 8px;
+            padding: 6px 8px 6px 30px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 13px;
+        }
+        .calendar-search:before {
+            content: '\f179';
+            font-family: dashicons;
+            position: absolute;
+            left: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #999;
+        }
+        .calendar-nav {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .calendar-nav select {
+            padding: 4px 24px 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: #fff url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="%23999"><path d="M6 9L1 4h10z"/></svg>') no-repeat right 8px center;
+        }
+        .calendar-nav button {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #666;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .calendar-nav button:hover {
+            background: #f0f0f1;
+            border-color: #999;
+        }
+        #categoryFilter {
+            padding: 4px 24px 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+            max-width: 200px;
         }
 
         /* Styles pour le drag & drop */
@@ -309,19 +366,34 @@ function generate_scheduled_posts_calendar_alpha() {
     <div class="wrap">
         <h1>Calendrier</h1>
         <div class="calendar-container" data-jetpack-boost="ignore">
-            <div class="calendar-search">
-                <input type="text" id="searchPosts" placeholder="Rechercher des articles...">
-            </div>
             <div class="calendar-header">
-                <div class="calendar-nav">
-                    <button id="prevMonth" data-jetpack-boost="ignore">&lt; Mois précédent</button>
-                    <button id="nextMonth" data-jetpack-boost="ignore">Mois suivant &gt;</button>
+                <div class="calendar-search">
+                    <input type="text" id="searchPosts" placeholder="Rechercher des articles...">
                 </div>
-                <h2 id="currentMonth" data-jetpack-boost="ignore"></h2>
+                <div class="calendar-nav">
+                    <button id="prevMonth">&lt;</button>
+                    <select id="monthSelect">
+                        <?php
+                        $months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                                  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+                        foreach ($months as $index => $month) {
+                            echo '<option value="' . $index . '">' . $month . '</option>';
+                        }
+                        ?>
+                    </select>
+                    <select id="yearSelect">
+                        <?php
+                        $currentYear = date('Y');
+                        for ($year = $currentYear - 2; $year <= $currentYear + 2; $year++) {
+                            echo '<option value="' . $year . '">' . $year . '</option>';
+                        }
+                        ?>
+                    </select>
+                    <button id="nextMonth">&gt;</button>
+                </div>
                 <select id="categoryFilter">
                     <option value="">Toutes les catégories</option>
                     <?php
-                    // Récupération des catégories
                     $categories = get_categories();
                     foreach ($categories as $category) {
                         echo '<option value="' . esc_attr($category->term_id) . '">' . esc_html($category->name) . '</option>';
@@ -351,20 +423,17 @@ function generate_scheduled_posts_calendar_alpha() {
             const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
             const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
             
-            // Mise à jour du titre du mois
-            const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
-                                'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-            document.getElementById('currentMonth').textContent = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+            // Mise à jour des sélecteurs
+            document.getElementById('monthSelect').value = date.getMonth();
+            document.getElementById('yearSelect').value = date.getFullYear();
 
-            // Récupération de tous les articles avec tous les statuts
+            // Récupération de tous les articles
             Promise.all([
-                // Récupération des articles publiés et programmés
                 fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&orderby=date&order=desc`, {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                     }
                 }).then(response => response.json()),
-                // Récupération des brouillons
                 fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&orderby=date&order=desc`, {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
@@ -372,12 +441,7 @@ function generate_scheduled_posts_calendar_alpha() {
                 }).then(response => response.json())
             ])
             .then(([publishedPosts, draftPosts]) => {
-                console.log('Articles publiés/programmés:', publishedPosts);
-                console.log('Brouillons:', draftPosts);
-                
-                // Fusion des deux types d'articles
                 const allPosts = [...publishedPosts, ...draftPosts];
-                
                 const categoryFilter = document.getElementById('categoryFilter').value;
                 const filteredPosts = categoryFilter ? allPosts.filter(post => post.categories.includes(parseInt(categoryFilter))) : allPosts;
                 generateCalendarGrid(firstDay, lastDay, filteredPosts);
@@ -487,7 +551,10 @@ function generate_scheduled_posts_calendar_alpha() {
             document.getElementById('avgPostsPerMonth').textContent = avgPostsPerMonth;
         }
 
-        // Boutons pour naviguer entre les mois
+        // Initialisation du calendrier
+        updateCalendar(currentDate);
+
+        // Gestionnaires d'événements pour la navigation
         document.getElementById('prevMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
             updateCalendar(currentDate);
@@ -498,12 +565,26 @@ function generate_scheduled_posts_calendar_alpha() {
             updateCalendar(currentDate);
         });
 
+        // Gestionnaires d'événements pour les sélecteurs
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        
+        monthSelect.addEventListener('change', function() {
+            currentDate.setMonth(parseInt(this.value));
+            updateCalendar(currentDate);
+        });
+        
+        yearSelect.addEventListener('change', function() {
+            currentDate.setFullYear(parseInt(this.value));
+            updateCalendar(currentDate);
+        });
+
         // Filtre par catégorie
         document.getElementById('categoryFilter').addEventListener('change', () => {
             updateCalendar(currentDate);
         });
 
-        // Fonction de recherche
+        // Recherche
         document.getElementById('searchPosts').addEventListener('input', function(e) {
             const searchTerm = e.target.value.toLowerCase();
             const postItems = document.querySelectorAll('.post-item');
@@ -522,9 +603,6 @@ function generate_scheduled_posts_calendar_alpha() {
         function initDragAndDrop() {
             // Fonction vide - drag & drop désactivé
         }
-
-        // Initialisation du calendrier
-        updateCalendar(currentDate);
     });
     </script>
     <?php
