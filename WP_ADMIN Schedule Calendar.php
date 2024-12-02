@@ -1,4 +1,9 @@
 <?php
+/**
+ * Changelog:
+ * Version 1.0.0d - Ajout d'un filtre par catégories et d'un code couleur pour les statuts des articles.
+ */
+
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
 if (!defined('ABSPATH')) exit;
 
@@ -71,13 +76,21 @@ function scheduled_posts_calendar_styles_alpha() {
             font-size: 12px;
             margin: 5px 0;
             padding: 5px;
-            background: #e9ecef;
             border-radius: 3px;
             cursor: pointer;
             transition: background 0.2s ease;
         }
-        .post-item:hover {
-            background: #dee2e6;
+        .post-item.published {
+            background: #d4edda; /* Vert clair pour les articles publiés */
+        }
+        .post-item.draft {
+            background: #fff3cd; /* Jaune clair pour les brouillons */
+        }
+        .post-item.pending {
+            background: #ffeeba; /* Jaune pour les articles en attente */
+        }
+        .post-item.future {
+            background: #cce5ff; /* Bleu clair pour les articles planifiés */
         }
         .today {
             border: 2px solid #2271b1;
@@ -116,6 +129,16 @@ function generate_scheduled_posts_calendar_alpha() {
                     <button id="nextMonth" data-jetpack-boost="ignore">Mois suivant &gt;</button>
                 </div>
                 <h2 id="currentMonth" data-jetpack-boost="ignore"></h2>
+                <select id="categoryFilter">
+                    <option value="">Toutes les catégories</option>
+                    <?php
+                    // Récupération des catégories
+                    $categories = get_categories();
+                    foreach ($categories as $category) {
+                        echo '<option value="' . esc_attr($category->term_id) . '">' . esc_html($category->name) . '</option>';
+                    }
+                    ?>
+                </select>
             </div>
             <div class="calendar-grid" id="calendarGrid" data-jetpack-boost="ignore">
                 <!-- Le calendrier sera généré ici par JavaScript -->
@@ -152,8 +175,10 @@ function generate_scheduled_posts_calendar_alpha() {
             })
             .then(response => response.json())
             .then(posts => {
-                generateCalendarGrid(firstDay, lastDay, posts);
-                updateMonthlyStats(posts, date.getFullYear(), date.getMonth());
+                const categoryFilter = document.getElementById('categoryFilter').value;
+                const filteredPosts = categoryFilter ? posts.filter(post => post.categories.includes(parseInt(categoryFilter))) : posts;
+                generateCalendarGrid(firstDay, lastDay, filteredPosts);
+                updateMonthlyStats(filteredPosts, date.getFullYear(), date.getMonth());
             });
         }
 
@@ -203,7 +228,7 @@ function generate_scheduled_posts_calendar_alpha() {
 
                 dayPosts.forEach(post => {
                     const postDiv = document.createElement('div');
-                    postDiv.className = 'post-item';
+                    postDiv.className = 'post-item ' + post.status; // Ajout de la classe pour le statut
                     const postTime = new Date(post.date).toLocaleTimeString('fr-FR', {
                         hour: '2-digit',
                         minute: '2-digit'
@@ -247,6 +272,11 @@ function generate_scheduled_posts_calendar_alpha() {
 
         document.getElementById('nextMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
+            updateCalendar(currentDate);
+        });
+
+        // Filtre par catégorie
+        document.getElementById('categoryFilter').addEventListener('change', () => {
             updateCalendar(currentDate);
         });
 
