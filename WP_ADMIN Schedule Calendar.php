@@ -22,6 +22,7 @@
  * v2.8 "Le Simplificateur" - Suppression du drag & drop et réorganisation des tuiles
  * v2.9 "L'Organisateur" - Refonte du header avec sélection directe des dates
  * v3.0 "L'Iconographe" - Amélioration des icônes et réorganisation des statistiques
+ * v3.1 "Le Statisticien" - Optimisation des requêtes et statistiques globales
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -490,8 +491,13 @@ function generate_scheduled_posts_calendar_alpha() {
             const after = firstDay.toISOString();
             const before = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59).toISOString();
 
-            // Récupération des articles avec filtre de date
+            // Dates pour l'année en cours
+            const yearStart = new Date(date.getFullYear(), 0, 1).toISOString();
+            const yearEnd = new Date(date.getFullYear(), 11, 31, 23, 59, 59).toISOString();
+
+            // Récupération des articles
             Promise.all([
+                // Articles du mois
                 fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&after=${after}&before=${before}&orderby=date&order=asc`, {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
@@ -501,34 +507,30 @@ function generate_scheduled_posts_calendar_alpha() {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                     }
-                }).then(response => response.json())
+                }).then(response => response.json()),
+                // Articles de l'année
+                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish&after=${yearStart}&before=${yearEnd}&orderby=date&order=desc`, {
+                    headers: {
+                        'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                    }
+                }).then(response => {
+                    const total = response.headers.get('X-WP-Total');
+                    return response.json().then(posts => ({ posts, total }));
+                })
             ])
-            .then(([publishedPosts, draftPosts]) => {
-                const allPosts = [...publishedPosts, ...draftPosts];
+            .then(([monthlyPublished, monthlyDrafts, yearlyPosts]) => {
+                const monthlyPosts = [...monthlyPublished, ...monthlyDrafts];
                 const categoryFilter = document.getElementById('categoryFilter').value;
-                const filteredPosts = categoryFilter ? allPosts.filter(post => post.categories.includes(parseInt(categoryFilter))) : allPosts;
+                const filteredPosts = categoryFilter ? monthlyPosts.filter(post => post.categories.includes(parseInt(categoryFilter))) : monthlyPosts;
+                
                 generateCalendarGrid(firstDay, lastDay, filteredPosts);
                 
-                // Pour les statistiques, on fait une requête supplémentaire pour l'année
-                const yearStart = new Date(date.getFullYear(), 0, 1).toISOString();
-                const yearEnd = new Date(date.getFullYear(), 11, 31, 23, 59, 59).toISOString();
-                
-                Promise.all([
-                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&after=${yearStart}&before=${yearEnd}`, {
-                        headers: {
-                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-                        }
-                    }).then(response => response.json()),
-                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&after=${yearStart}&before=${yearEnd}`, {
-                        headers: {
-                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-                        }
-                    }).then(response => response.json())
-                ])
-                .then(([yearlyPublished, yearlyDrafts]) => {
-                    const yearlyPosts = [...yearlyPublished, ...yearlyDrafts];
-                    updateMonthlyStats(yearlyPosts, filteredPosts.length, date.getFullYear(), date.getMonth());
-                });
+                // Calcul des statistiques
+                const currentMonth = date.getMonth() + 1; // Mois en cours (1-12)
+                const yearlyTotal = parseInt(yearlyPosts.total) || yearlyPosts.posts.length;
+                const avgPostsPerMonth = currentMonth > 0 ? (yearlyTotal / currentMonth).toFixed(2) : 0;
+
+                updateMonthlyStats(yearlyTotal, filteredPosts.length, avgPostsPerMonth);
             })
             .catch(error => {
                 console.error('Erreur lors de la récupération des articles:', error);
@@ -637,13 +639,10 @@ function generate_scheduled_posts_calendar_alpha() {
             }
         }
 
-        function updateMonthlyStats(yearlyPosts, monthlyCount, year, month) {
-            const avgPostsPerMonth = (yearlyPosts.length > 0) ? 
-                (yearlyPosts.length / 12).toFixed(2) : 0;
-
-            document.getElementById('totalYearPosts').textContent = yearlyPosts.length;
+        function updateMonthlyStats(yearlyTotal, monthlyCount, avgPerMonth) {
+            document.getElementById('totalYearPosts').textContent = yearlyTotal;
             document.getElementById('totalMonthPosts').textContent = monthlyCount;
-            document.getElementById('avgPostsPerMonth').textContent = avgPostsPerMonth;
+            document.getElementById('avgPostsPerMonth').textContent = avgPerMonth;
         }
 
         // Gestionnaires d'événements pour la navigation
