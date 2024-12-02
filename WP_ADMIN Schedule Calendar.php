@@ -396,6 +396,27 @@ function scheduled_posts_calendar_styles_alpha() {
 // Ajouter les styles à l'administration
 add_action('admin_head', 'scheduled_posts_calendar_styles_alpha');
 
+// Fonction pour récupérer la plage d'années des articles
+function get_posts_years_range() {
+    global $wpdb;
+    $result = $wpdb->get_row("
+        SELECT 
+            MIN(YEAR(post_date)) as min_year,
+            MAX(YEAR(post_date)) as max_year
+        FROM $wpdb->posts
+        WHERE post_type = 'post'
+        AND post_status IN ('publish', 'future', 'draft')
+    ");
+    
+    $min_year = $result->min_year ? intval($result->min_year) : date('Y');
+    $max_year = $result->max_year ? intval($result->max_year) : date('Y');
+    
+    // Ajouter une année supplémentaire pour les articles futurs
+    $max_year = max($max_year, date('Y') + 1);
+    
+    return array($min_year, $max_year);
+}
+
 // Fonction pour générer le HTML du calendrier
 function generate_scheduled_posts_calendar_alpha() {
     ?>
@@ -419,9 +440,10 @@ function generate_scheduled_posts_calendar_alpha() {
                     </select>
                     <select id="yearSelect">
                         <?php
-                        $currentYear = date('Y');
-                        for ($year = $currentYear - 2; $year <= $currentYear + 2; $year++) {
-                            echo '<option value="' . $year . '">' . $year . '</option>';
+                        list($min_year, $max_year) = get_posts_years_range();
+                        for ($year = $min_year; $year <= $max_year; $year++) {
+                            $selected = $year == date('Y') ? ' selected' : '';
+                            echo '<option value="' . $year . '"' . $selected . '>' . $year . '</option>';
                         }
                         ?>
                     </select>
@@ -452,22 +474,30 @@ function generate_scheduled_posts_calendar_alpha() {
     document.addEventListener('DOMContentLoaded', function() {
         let currentDate = new Date();
 
+        // Initialisation des sélecteurs
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        
+        // Mise à jour initiale des sélecteurs
+        monthSelect.value = currentDate.getMonth();
+        yearSelect.value = currentDate.getFullYear();
+        
         function updateCalendar(date) {
             const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
             const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-            
-            // Mise à jour des sélecteurs
-            document.getElementById('monthSelect').value = date.getMonth();
-            document.getElementById('yearSelect').value = date.getFullYear();
 
-            // Récupération de tous les articles
+            // Formatage des dates pour l'API WordPress
+            const after = firstDay.toISOString();
+            const before = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59).toISOString();
+
+            // Récupération des articles avec filtre de date
             Promise.all([
-                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&orderby=date&order=desc`, {
+                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&after=${after}&before=${before}&orderby=date&order=asc`, {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                     }
                 }).then(response => response.json()),
-                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&orderby=date&order=desc`, {
+                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&after=${after}&before=${before}&orderby=date&order=asc`, {
                     headers: {
                         'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                     }
@@ -478,7 +508,27 @@ function generate_scheduled_posts_calendar_alpha() {
                 const categoryFilter = document.getElementById('categoryFilter').value;
                 const filteredPosts = categoryFilter ? allPosts.filter(post => post.categories.includes(parseInt(categoryFilter))) : allPosts;
                 generateCalendarGrid(firstDay, lastDay, filteredPosts);
-                updateMonthlyStats(filteredPosts, date.getFullYear(), date.getMonth());
+                
+                // Pour les statistiques, on fait une requête supplémentaire pour l'année
+                const yearStart = new Date(date.getFullYear(), 0, 1).toISOString();
+                const yearEnd = new Date(date.getFullYear(), 11, 31, 23, 59, 59).toISOString();
+                
+                Promise.all([
+                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&after=${yearStart}&before=${yearEnd}`, {
+                        headers: {
+                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                        }
+                    }).then(response => response.json()),
+                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&after=${yearStart}&before=${yearEnd}`, {
+                        headers: {
+                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                        }
+                    }).then(response => response.json())
+                ])
+                .then(([yearlyPublished, yearlyDrafts]) => {
+                    const yearlyPosts = [...yearlyPublished, ...yearlyDrafts];
+                    updateMonthlyStats(yearlyPosts, filteredPosts.length, date.getFullYear(), date.getMonth());
+                });
             })
             .catch(error => {
                 console.error('Erreur lors de la récupération des articles:', error);
@@ -585,52 +635,45 @@ function generate_scheduled_posts_calendar_alpha() {
                 emptyDay.appendChild(dateDiv);
                 grid.appendChild(emptyDay);
             }
-
-            // Initialisation du drag & drop après la génération du calendrier
-            initDragAndDrop();
         }
 
-        function updateMonthlyStats(posts, year, month) {
-            // Filtrer les articles de l'année en cours
-            const yearlyPosts = posts.filter(post => new Date(post.date).getFullYear() === year);
-            const monthlyPosts = posts.filter(post => new Date(post.date).getFullYear() === year && new Date(post.date).getMonth() === month);
-
-            // Calcul de la moyenne des articles par mois
+        function updateMonthlyStats(yearlyPosts, monthlyCount, year, month) {
             const avgPostsPerMonth = (yearlyPosts.length > 0) ? 
                 (yearlyPosts.length / 12).toFixed(2) : 0;
 
             document.getElementById('totalYearPosts').textContent = yearlyPosts.length;
-            document.getElementById('totalMonthPosts').textContent = monthlyPosts.length;
+            document.getElementById('totalMonthPosts').textContent = monthlyCount;
             document.getElementById('avgPostsPerMonth').textContent = avgPostsPerMonth;
         }
-
-        // Initialisation du calendrier
-        updateCalendar(currentDate);
 
         // Gestionnaires d'événements pour la navigation
         document.getElementById('prevMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-            updateCalendar(currentDate);
+            updateSelectorsAndCalendar();
         });
 
         document.getElementById('nextMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-            updateCalendar(currentDate);
+            updateSelectorsAndCalendar();
         });
 
         // Gestionnaires d'événements pour les sélecteurs
-        const monthSelect = document.getElementById('monthSelect');
-        const yearSelect = document.getElementById('yearSelect');
-        
         monthSelect.addEventListener('change', function() {
-            currentDate.setMonth(parseInt(this.value));
+            currentDate = new Date(currentDate.getFullYear(), parseInt(this.value), 1);
             updateCalendar(currentDate);
         });
         
         yearSelect.addEventListener('change', function() {
-            currentDate.setFullYear(parseInt(this.value));
+            currentDate = new Date(parseInt(this.value), currentDate.getMonth(), 1);
             updateCalendar(currentDate);
         });
+
+        // Fonction pour mettre à jour les sélecteurs et le calendrier
+        function updateSelectorsAndCalendar() {
+            monthSelect.value = currentDate.getMonth();
+            yearSelect.value = currentDate.getFullYear();
+            updateCalendar(currentDate);
+        }
 
         // Filtre par catégorie
         document.getElementById('categoryFilter').addEventListener('change', () => {
@@ -652,10 +695,8 @@ function generate_scheduled_posts_calendar_alpha() {
             });
         });
 
-        // Initialisation du drag & drop
-        function initDragAndDrop() {
-            // Fonction vide - drag & drop désactivé
-        }
+        // Initialisation du calendrier
+        updateCalendar(currentDate);
     });
     </script>
     <?php
