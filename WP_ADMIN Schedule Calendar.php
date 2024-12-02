@@ -17,6 +17,8 @@
  * v2.3 "Le Jongleur" - Ajout du drag & drop et de la recherche rapide
  * v2.4 "L'Ergonome" - Réorganisation de l'affichage des articles avec actions et grip
  * v2.5 "L'Esthète" - Refonte des tuiles articles et amélioration du drag & drop
+ * v2.6 "Le Perfectionniste" - Correction du drag & drop et stabilisation des icônes
+ * v2.7 "Le Navigateur" - Ajout du raccourci dans la barre d'administration
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -100,7 +102,6 @@ function scheduled_posts_calendar_styles_alpha() {
             margin: 5px 0;
             padding: 8px;
             border-radius: 6px;
-            transition: all 0.2s ease;
             position: relative;
             display: flex;
             flex-direction: column;
@@ -255,28 +256,20 @@ function scheduled_posts_calendar_styles_alpha() {
             font-weight: 500;
             line-height: 1.4;
             padding: 0 4px;
+            margin-bottom: 8px;
         }
 
         .post-footer {
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
             padding-top: 6px;
-            border-top: 1px solid rgba(0,0,0,0.05);
-        }
-
-        .post-grip {
-            cursor: move;
-            color: #999;
-            padding: 2px;
+            border-top: 1px solid rgba(0,0,0,0.06);
         }
 
         .post-time {
             font-size: 11px;
             color: #666;
-            flex: 1;
-            text-align: center;
-            margin: 0 8px;
         }
 
         .post-actions {
@@ -287,8 +280,6 @@ function scheduled_posts_calendar_styles_alpha() {
         .post-actions a {
             text-decoration: none;
             color: #666;
-            display: flex;
-            align-items: center;
             padding: 2px;
             border-radius: 3px;
             transition: all 0.2s ease;
@@ -296,26 +287,14 @@ function scheduled_posts_calendar_styles_alpha() {
 
         .post-actions a:hover {
             color: #2271b1;
-            background: rgba(0,0,0,0.05);
         }
 
-        .post-item .dashicons {
-            font-size: 14px;
-            width: 14px;
-            height: 14px;
-            line-height: 14px;
-        }
-
-        /* Styles pour le drag & drop */
-        .post-item.ui-draggable-dragging {
-            transform: scale(0.95);
-            opacity: 0.8;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .calendar-day.droppable-hover {
-            background: #f0f7ff;
-            box-shadow: inset 0 0 0 2px #2271b1;
+        .dashicons-visibility.dashicons {
+            position: relative !important;
+            top: 0 !important;
+            left: 0 !important;
+            transform: none !important;
+            transition: none !important;
         }
     </style>
     <?php
@@ -472,7 +451,6 @@ function generate_scheduled_posts_calendar_alpha() {
                     postDiv.innerHTML = `
                         <div class="post-title">${postTitle}</div>
                         <div class="post-footer">
-                            <span class="post-grip dashicons dashicons-menu"></span>
                             <span class="post-time">${postTime}</span>
                             <div class="post-actions">
                                 <a href="${post.link}" target="_blank" title="Voir l'article">
@@ -491,7 +469,7 @@ function generate_scheduled_posts_calendar_alpha() {
                 grid.appendChild(dayCell);
             }
 
-            // Initialiser le drag & drop après la génération du calendrier
+            // Initialisation du drag & drop après la génération du calendrier
             initDragAndDrop();
         }
 
@@ -542,60 +520,7 @@ function generate_scheduled_posts_calendar_alpha() {
 
         // Initialisation du drag & drop
         function initDragAndDrop() {
-            $('.post-item').draggable({
-                handle: '.post-grip',
-                revert: 'invalid',
-                zIndex: 100,
-                cursor: 'move',
-                cursorAt: { top: 15, left: 15 },
-                helper: function() {
-                    const clone = $(this).clone().css({
-                        width: $(this).width(),
-                        height: 'auto'
-                    });
-                    return clone;
-                },
-                start: function(event, ui) {
-                    $(this).addClass('dragging');
-                },
-                stop: function(event, ui) {
-                    $(this).removeClass('dragging');
-                }
-            });
-
-            $('.calendar-day').droppable({
-                accept: '.post-item',
-                hoverClass: 'droppable-hover',
-                drop: function(event, ui) {
-                    const postId = ui.draggable.data('post-id');
-                    const newDate = $(this).data('date');
-                    const oldDate = new Date(ui.draggable.closest('.calendar-day').data('date'));
-                    const newDateTime = new Date(newDate);
-                    
-                    // Conserver l'heure de l'article original
-                    newDateTime.setHours(oldDate.getHours());
-                    newDateTime.setMinutes(oldDate.getMinutes());
-
-                    // Mise à jour via l'API REST
-                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts/')); ?>${postId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-                        },
-                        body: JSON.stringify({
-                            date: newDateTime.toISOString()
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(post => {
-                        updateCalendar(currentDate);
-                    })
-                    .catch(error => {
-                        console.error('Erreur lors de la mise à jour de la date:', error);
-                    });
-                }
-            });
+            // Fonction vide - drag & drop désactivé
         }
 
         // Initialisation du calendrier
@@ -609,4 +534,16 @@ function generate_scheduled_posts_calendar_alpha() {
 add_action('admin_menu', function() {
     add_menu_page('Calendrier des Articles', 'Calendrier', 'edit_posts', 'scheduled-posts-calendar', 'generate_scheduled_posts_calendar_alpha', 'dashicons-calendar-alt', 6);
 });
+
+// Ajout de l'entrée dans la barre d'administration
+add_action('admin_bar_menu', function($admin_bar) {
+    $admin_bar->add_node([
+        'id'    => 'calendar',
+        'title' => '<span class="ab-icon dashicons dashicons-calendar-alt"></span> Cal.',
+        'href'  => admin_url('admin.php?page=scheduled-posts-calendar'),
+        'meta'  => [
+            'title' => 'Voir le calendrier des articles',
+        ],
+    ]);
+}, 100);
 ?>
