@@ -1,7 +1,7 @@
 <?php
 /**
  * Changelog:
- * Version 1.0.0i - Correction de la requête pour inclure explicitement tous les statuts d'articles (publish, future, draft, pending).
+ * Version 1.0.0j - Ajout des brouillons dans la requête et mise à jour des couleurs.
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -80,11 +80,11 @@ function scheduled_posts_calendar_styles_alpha() {
             cursor: pointer;
             transition: background 0.2s ease;
         }
-        .post-item.published {
+        .post-item.publish {
             background: #d4edda; /* Vert clair pour les articles publiés */
         }
         .post-item.draft {
-            background: #fff3cd; /* Jaune clair pour les brouillons */
+            background: #ffe5d9; /* Orange clair pour les brouillons */
         }
         .post-item.pending {
             background: #ffeeba; /* Jaune pour les articles en attente */
@@ -168,16 +168,29 @@ function generate_scheduled_posts_calendar_alpha() {
             document.getElementById('currentMonth').textContent = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
 
             // Récupération de tous les articles avec tous les statuts
-            fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future,draft,pending&orderby=date&order=desc`, {
-                headers: {
-                    'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
-                }
-            })
-            .then(response => response.json())
-            .then(posts => {
-                console.log('Posts récupérés:', posts); // Pour le débogage
+            Promise.all([
+                // Récupération des articles publiés et programmés
+                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=publish,future&orderby=date&order=desc`, {
+                    headers: {
+                        'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                    }
+                }).then(response => response.json()),
+                // Récupération des brouillons
+                fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?per_page=100&status=draft&orderby=date&order=desc`, {
+                    headers: {
+                        'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                    }
+                }).then(response => response.json())
+            ])
+            .then(([publishedPosts, draftPosts]) => {
+                console.log('Articles publiés/programmés:', publishedPosts);
+                console.log('Brouillons:', draftPosts);
+                
+                // Fusion des deux types d'articles
+                const allPosts = [...publishedPosts, ...draftPosts];
+                
                 const categoryFilter = document.getElementById('categoryFilter').value;
-                const filteredPosts = categoryFilter ? posts.filter(post => post.categories.includes(parseInt(categoryFilter))) : posts;
+                const filteredPosts = categoryFilter ? allPosts.filter(post => post.categories.includes(parseInt(categoryFilter))) : allPosts;
                 generateCalendarGrid(firstDay, lastDay, filteredPosts);
                 updateMonthlyStats(filteredPosts, date.getFullYear(), date.getMonth());
             })
