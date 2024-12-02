@@ -1,3 +1,4 @@
+<?php
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
 if (!defined('ABSPATH')) exit;
 
@@ -81,6 +82,23 @@ function scheduled_posts_calendar_styles_alpha() {
         .today {
             border: 2px solid #2271b1;
         }
+        .monthly-stats {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .monthly-stats ul {
+            list-style: none;
+            padding: 0;
+        }
+        .monthly-stats li {
+            font-size: 14px;
+            margin: 5px 0;
+        }
+        .monthly-stats li span {
+            font-weight: bold;
+        }
     </style>
     <?php
 }
@@ -102,13 +120,21 @@ function generate_scheduled_posts_calendar_alpha() {
             <div class="calendar-grid" id="calendarGrid" data-jetpack-boost="ignore">
                 <!-- Le calendrier sera généré ici par JavaScript -->
             </div>
+            <div class="monthly-stats">
+                <h3>Statistiques de l'année</h3>
+                <ul>
+                    <li><span>Total des articles de l'année :</span> <span id="totalYearPosts"></span></li>
+                    <li><span>Total des articles du mois :</span> <span id="totalMonthPosts"></span></li>
+                    <li><span>Moyenne des articles par mois :</span> <span id="avgPostsPerMonth"></span></li>
+                </ul>
+            </div>
         </div>
     </div>
 
     <script data-jetpack-boost="ignore">
     document.addEventListener('DOMContentLoaded', function() {
         let currentDate = new Date();
-        
+
         function updateCalendar(date) {
             const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
             const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
@@ -117,7 +143,7 @@ function generate_scheduled_posts_calendar_alpha() {
             const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
                                 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
             document.getElementById('currentMonth').textContent = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-            
+
             // Récupération des articles publiés
             fetch(`<?php echo esc_url(rest_url('wp/v2/posts')); ?>?status=publish&per_page=100&orderby=date&order=desc`, {
                 headers: {
@@ -127,13 +153,14 @@ function generate_scheduled_posts_calendar_alpha() {
             .then(response => response.json())
             .then(posts => {
                 generateCalendarGrid(firstDay, lastDay, posts);
+                updateMonthlyStats(posts, date.getFullYear(), date.getMonth());
             });
         }
 
         function generateCalendarGrid(firstDay, lastDay, posts) {
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
-            
+
             // Ajout des en-têtes des jours
             const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
             dayNames.forEach(day => {
@@ -142,7 +169,7 @@ function generate_scheduled_posts_calendar_alpha() {
                 dayHeader.textContent = day;
                 grid.appendChild(dayHeader);
             });
-            
+
             // Ajout des cases vides pour le début du mois
             const emptyDaysStart = (firstDay.getDay() || 7) - 1;
             for (let i = 0; i < emptyDaysStart; i++) {
@@ -150,7 +177,7 @@ function generate_scheduled_posts_calendar_alpha() {
                 emptyDay.className = 'calendar-day empty';
                 grid.appendChild(emptyDay);
             }
-            
+
             // Ajout des jours du mois
             for (let day = 1; day <= lastDay.getDate(); day++) {
                 const dayCell = document.createElement('div');
@@ -160,20 +187,20 @@ function generate_scheduled_posts_calendar_alpha() {
                 if (currentDayDate.toDateString() === new Date().toDateString()) {
                     dayCell.classList.add('today');
                 }
-                
+
                 const dateDiv = document.createElement('div');
                 dateDiv.className = 'date';
                 dateDiv.textContent = day;
                 dayCell.appendChild(dateDiv);
-                
+
                 // Ajout des articles pour ce jour
                 const dayPosts = posts.filter(post => {
                     const postDate = new Date(post.date);
-                    return postDate.getDate() === day && 
+                    return postDate.getDate() === day &&
                            postDate.getMonth() === firstDay.getMonth() &&
                            postDate.getFullYear() === firstDay.getFullYear();
                 });
-                
+
                 dayPosts.forEach(post => {
                     const postDiv = document.createElement('div');
                     postDiv.className = 'post-item';
@@ -193,22 +220,36 @@ function generate_scheduled_posts_calendar_alpha() {
                     };
                     dayCell.appendChild(postDiv);
                 });
-                
+
                 grid.appendChild(dayCell);
             }
         }
-        
-        // Gestionnaires d'événements pour la navigation
+
+        function updateMonthlyStats(posts, year, month) {
+            // Filtrer les articles de l'année en cours
+            const yearlyPosts = posts.filter(post => new Date(post.date).getFullYear() === year);
+            const monthlyPosts = posts.filter(post => new Date(post.date).getFullYear() === year && new Date(post.date).getMonth() === month);
+
+            // Calcul de la moyenne des articles par mois
+            const avgPostsPerMonth = (yearlyPosts.length > 0) ? 
+                (yearlyPosts.length / 12).toFixed(2) : 0;
+
+            document.getElementById('totalYearPosts').textContent = yearlyPosts.length;
+            document.getElementById('totalMonthPosts').textContent = monthlyPosts.length;
+            document.getElementById('avgPostsPerMonth').textContent = avgPostsPerMonth;
+        }
+
+        // Boutons pour naviguer entre les mois
         document.getElementById('prevMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
             updateCalendar(currentDate);
         });
-        
+
         document.getElementById('nextMonth').addEventListener('click', () => {
             currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
             updateCalendar(currentDate);
         });
-        
+
         // Initialisation du calendrier
         updateCalendar(currentDate);
     });
@@ -216,16 +257,8 @@ function generate_scheduled_posts_calendar_alpha() {
     <?php
 }
 
-// Ajout du menu dans l'administration WordPress
-function add_scheduled_posts_calendar_menu_alpha() {
-    add_menu_page(
-        'Calendrier des Articles',
-        'Calendrier Articles',
-        'edit_posts',
-        'scheduled-posts-calendar',
-        'generate_scheduled_posts_calendar_alpha',
-        'dashicons-calendar-alt',
-        6
-    );
-}
-add_action('admin_menu', 'add_scheduled_posts_calendar_menu_alpha');
+// Ajout de la page du calendrier au menu admin
+add_action('admin_menu', function() {
+    add_menu_page('Calendrier des Articles', 'Calendrier Articles', 'edit_posts', 'scheduled-posts-calendar', 'generate_scheduled_posts_calendar_alpha', 'dashicons-calendar-alt', 6);
+});
+?>
