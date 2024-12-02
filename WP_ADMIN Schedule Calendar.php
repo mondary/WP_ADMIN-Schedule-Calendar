@@ -13,10 +13,20 @@
  * v1.9 "Le Brouillon Farceur" - Ajout des brouillons et mise à jour des couleurs
  * v2.0 "L'Arc-en-Ciel" - Harmonisation des couleurs entre les vues
  * v2.1 "Le Minimaliste" - Simplification du menu et historique complet
+ * v2.2 "L'Épurateur" - Simplification des titres
+ * v2.3 "Le Jongleur" - Ajout du drag & drop et de la recherche rapide
+ * v2.4 "L'Ergonome" - Réorganisation de l'affichage des articles avec actions et grip
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
 if (!defined('ABSPATH')) exit;
+
+// Ajout des scripts nécessaires
+function add_calendar_scripts() {
+    wp_enqueue_script('jquery-ui-draggable');
+    wp_enqueue_script('jquery-ui-droppable');
+}
+add_action('admin_enqueue_scripts', 'add_calendar_scripts');
 
 // Ajout du style CSS pour le calendrier et la liste d'articles
 function scheduled_posts_calendar_styles_alpha() {
@@ -87,10 +97,13 @@ function scheduled_posts_calendar_styles_alpha() {
         .post-item {
             font-size: 12px;
             margin: 5px 0;
-            padding: 5px;
+            padding: 5px 8px;
             border-radius: 3px;
-            cursor: pointer;
+            cursor: move;
             transition: background 0.2s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
         }
         .post-item.publish,
         .status-publish {
@@ -161,6 +174,80 @@ function scheduled_posts_calendar_styles_alpha() {
         .wp-list-table tr td {
             color: #000 !important;
         }
+
+        /* Styles pour la barre de recherche */
+        .calendar-search {
+            margin: 10px 0;
+            padding: 10px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .calendar-search input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Styles pour le drag & drop */
+        .post-item.dragging {
+            opacity: 0.5;
+            cursor: move;
+        }
+        .calendar-day.droppable-hover {
+            background: #f0f7ff;
+        }
+
+        .post-time {
+            font-size: 10px;
+            color: #666;
+            position: absolute;
+            top: 2px;
+            right: 5px;
+        }
+
+        .post-grip {
+            cursor: move;
+            padding-right: 8px;
+            color: #999;
+        }
+
+        .post-title {
+            flex-grow: 1;
+            margin-right: 5px;
+            padding-right: 45px;
+        }
+
+        .post-actions {
+            display: none;
+            position: absolute;
+            right: 5px;
+            bottom: 2px;
+        }
+
+        .post-item:hover .post-actions {
+            display: block;
+        }
+
+        .post-actions a {
+            text-decoration: none;
+            color: #666;
+            margin-left: 8px;
+            font-size: 14px;
+        }
+
+        .post-actions a:hover {
+            color: #2271b1;
+        }
+
+        /* Ajout des styles pour le dashicons */
+        .post-item .dashicons {
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
+            line-height: 14px;
+        }
     </style>
     <?php
 }
@@ -172,8 +259,11 @@ add_action('admin_head', 'scheduled_posts_calendar_styles_alpha');
 function generate_scheduled_posts_calendar_alpha() {
     ?>
     <div class="wrap">
-        <h1>Calendrier des Articles - Version Alpha</h1>
+        <h1>Calendrier</h1>
         <div class="calendar-container" data-jetpack-boost="ignore">
+            <div class="calendar-search">
+                <input type="text" id="searchPosts" placeholder="Rechercher des articles...">
+            </div>
             <div class="calendar-header">
                 <div class="calendar-nav">
                     <button id="prevMonth" data-jetpack-boost="ignore">&lt; Mois précédent</button>
@@ -296,26 +386,42 @@ function generate_scheduled_posts_calendar_alpha() {
 
                 dayPosts.forEach(post => {
                     const postDiv = document.createElement('div');
-                    postDiv.className = 'post-item ' + post.status; // Ajout de la classe pour le statut
+                    postDiv.className = 'post-item ' + post.status;
+                    postDiv.setAttribute('data-post-id', post.id);
+
                     const postTime = new Date(post.date).toLocaleTimeString('fr-FR', {
                         hour: '2-digit',
                         minute: '2-digit'
                     });
+
                     const postTitle = post.title.rendered.replace(/&amp;/g, '&')
                         .replace(/&lt;/g, '<')
                         .replace(/&gt;/g, '>')
                         .replace(/&quot;/g, '"')
                         .replace(/&#039;/g, "'");
-                    postDiv.innerHTML = `${postTime} - ${postTitle}`;
-                    postDiv.title = postTitle;
-                    postDiv.onclick = () => {
-                        window.location.href = `<?php echo admin_url('post.php'); ?>?post=${post.id}&action=edit`;
-                    };
+
+                    postDiv.innerHTML = `
+                        <span class="post-grip dashicons dashicons-menu"></span>
+                        <span class="post-time">${postTime}</span>
+                        <span class="post-title">${postTitle}</span>
+                        <div class="post-actions">
+                            <a href="${post.link}" target="_blank" title="Voir l'article">
+                                <span class="dashicons dashicons-visibility"></span>
+                            </a>
+                            <a href="<?php echo admin_url('post.php'); ?>?post=${post.id}&action=edit" title="Modifier l'article">
+                                <span class="dashicons dashicons-edit"></span>
+                            </a>
+                        </div>
+                    `;
+
                     dayCell.appendChild(postDiv);
                 });
 
                 grid.appendChild(dayCell);
             }
+
+            // Initialiser le drag & drop après la génération du calendrier
+            initDragAndDrop();
         }
 
         function updateMonthlyStats(posts, year, month) {
@@ -347,6 +453,65 @@ function generate_scheduled_posts_calendar_alpha() {
         document.getElementById('categoryFilter').addEventListener('change', () => {
             updateCalendar(currentDate);
         });
+
+        // Fonction de recherche
+        document.getElementById('searchPosts').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const postItems = document.querySelectorAll('.post-item');
+            
+            postItems.forEach(item => {
+                const title = item.textContent.toLowerCase();
+                if (title.includes(searchTerm)) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        });
+
+        // Initialisation du drag & drop
+        function initDragAndDrop() {
+            $('.post-item').draggable({
+                handle: '.post-grip',  // Utilise uniquement l'icône grip pour le drag
+                revert: 'invalid',
+                helper: 'clone',
+                start: function(event, ui) {
+                    $(this).addClass('dragging');
+                },
+                stop: function(event, ui) {
+                    $(this).removeClass('dragging');
+                }
+            });
+
+            $('.calendar-day').droppable({
+                accept: '.post-item',
+                hoverClass: 'droppable-hover',
+                drop: function(event, ui) {
+                    const postId = ui.draggable.data('post-id');
+                    const newDate = $(this).data('date');
+                    
+                    // Mise à jour de la date de publication via l'API REST
+                    fetch(`<?php echo esc_url(rest_url('wp/v2/posts/')); ?>${postId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
+                        },
+                        body: JSON.stringify({
+                            date: newDate
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(post => {
+                        // Rafraîchir le calendrier
+                        updateCalendar(currentDate);
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors de la mise à jour de la date:', error);
+                    });
+                }
+            });
+        }
 
         // Initialisation du calendrier
         updateCalendar(currentDate);
