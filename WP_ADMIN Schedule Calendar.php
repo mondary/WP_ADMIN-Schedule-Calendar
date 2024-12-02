@@ -45,7 +45,7 @@ function scheduled_posts_calendar_styles_alpha() {
         }
         .calendar-header {
             display: grid;
-            grid-template-columns: 1fr auto auto;
+            grid-template-columns: minmax(200px, 1fr) auto minmax(150px, auto) auto;
             gap: 12px;
             align-items: center;
             background: #fff;
@@ -353,6 +353,28 @@ function scheduled_posts_calendar_styles_alpha() {
             transform: none !important;
             transition: none !important;
         }
+
+        /* Style pour les statistiques */
+        .calendar-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 11px;
+            color: #666;
+            margin-left: auto;
+            padding-left: 16px;
+            border-left: 1px solid #ddd;
+        }
+
+        .calendar-stats span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .calendar-stats .count {
+            font-weight: 600;
+            color: #2271b1;
+        }
     </style>
     <?php
 }
@@ -400,17 +422,14 @@ function generate_scheduled_posts_calendar_alpha() {
                     }
                     ?>
                 </select>
+                <div class="calendar-stats">
+                    <span title="Articles du mois"><i class="dashicons dashicons-calendar"></i> <span id="totalMonthPosts" class="count">0</span></span>
+                    <span title="Moyenne mensuelle"><i class="dashicons dashicons-chart-bar"></i> <span id="avgPostsPerMonth" class="count">0</span></span>
+                    <span title="Total de l'année"><i class="dashicons dashicons-calendar-alt"></i> <span id="totalYearPosts" class="count">0</span></span>
+                </div>
             </div>
             <div class="calendar-grid" id="calendarGrid" data-jetpack-boost="ignore">
                 <!-- Le calendrier sera généré ici par JavaScript -->
-            </div>
-            <div class="monthly-stats">
-                <h3>Statistiques de l'année</h3>
-                <ul>
-                    <li><span>Total des articles de l'année :</span> <span id="totalYearPosts"></span></li>
-                    <li><span>Total des articles du mois :</span> <span id="totalMonthPosts"></span></li>
-                    <li><span>Moyenne des articles par mois :</span> <span id="avgPostsPerMonth"></span></li>
-                </ul>
             </div>
         </div>
     </div>
