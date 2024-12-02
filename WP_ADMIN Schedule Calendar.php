@@ -16,6 +16,7 @@
  * v2.2 "L'Épurateur" - Simplification des titres
  * v2.3 "Le Jongleur" - Ajout du drag & drop et de la recherche rapide
  * v2.4 "L'Ergonome" - Réorganisation de l'affichage des articles avec actions et grip
+ * v2.5 "L'Esthète" - Refonte des tuiles articles et amélioration du drag & drop
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -97,13 +98,14 @@ function scheduled_posts_calendar_styles_alpha() {
         .post-item {
             font-size: 12px;
             margin: 5px 0;
-            padding: 5px 8px;
-            border-radius: 3px;
-            cursor: move;
-            transition: background 0.2s ease;
+            padding: 8px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
             position: relative;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            gap: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .post-item.publish,
         .status-publish {
@@ -247,6 +249,73 @@ function scheduled_posts_calendar_styles_alpha() {
             width: 14px;
             height: 14px;
             line-height: 14px;
+        }
+
+        .post-title {
+            font-weight: 500;
+            line-height: 1.4;
+            padding: 0 4px;
+        }
+
+        .post-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 6px;
+            border-top: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .post-grip {
+            cursor: move;
+            color: #999;
+            padding: 2px;
+        }
+
+        .post-time {
+            font-size: 11px;
+            color: #666;
+            flex: 1;
+            text-align: center;
+            margin: 0 8px;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .post-actions a {
+            text-decoration: none;
+            color: #666;
+            display: flex;
+            align-items: center;
+            padding: 2px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+
+        .post-actions a:hover {
+            color: #2271b1;
+            background: rgba(0,0,0,0.05);
+        }
+
+        .post-item .dashicons {
+            font-size: 14px;
+            width: 14px;
+            height: 14px;
+            line-height: 14px;
+        }
+
+        /* Styles pour le drag & drop */
+        .post-item.ui-draggable-dragging {
+            transform: scale(0.95);
+            opacity: 0.8;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .calendar-day.droppable-hover {
+            background: #f0f7ff;
+            box-shadow: inset 0 0 0 2px #2271b1;
         }
     </style>
     <?php
@@ -401,16 +470,18 @@ function generate_scheduled_posts_calendar_alpha() {
                         .replace(/&#039;/g, "'");
 
                     postDiv.innerHTML = `
-                        <span class="post-grip dashicons dashicons-menu"></span>
-                        <span class="post-time">${postTime}</span>
-                        <span class="post-title">${postTitle}</span>
-                        <div class="post-actions">
-                            <a href="${post.link}" target="_blank" title="Voir l'article">
-                                <span class="dashicons dashicons-visibility"></span>
-                            </a>
-                            <a href="<?php echo admin_url('post.php'); ?>?post=${post.id}&action=edit" title="Modifier l'article">
-                                <span class="dashicons dashicons-edit"></span>
-                            </a>
+                        <div class="post-title">${postTitle}</div>
+                        <div class="post-footer">
+                            <span class="post-grip dashicons dashicons-menu"></span>
+                            <span class="post-time">${postTime}</span>
+                            <div class="post-actions">
+                                <a href="${post.link}" target="_blank" title="Voir l'article">
+                                    <span class="dashicons dashicons-visibility"></span>
+                                </a>
+                                <a href="<?php echo admin_url('post.php'); ?>?post=${post.id}&action=edit" title="Modifier l'article">
+                                    <span class="dashicons dashicons-edit"></span>
+                                </a>
+                            </div>
                         </div>
                     `;
 
@@ -472,9 +543,18 @@ function generate_scheduled_posts_calendar_alpha() {
         // Initialisation du drag & drop
         function initDragAndDrop() {
             $('.post-item').draggable({
-                handle: '.post-grip',  // Utilise uniquement l'icône grip pour le drag
+                handle: '.post-grip',
                 revert: 'invalid',
-                helper: 'clone',
+                zIndex: 100,
+                cursor: 'move',
+                cursorAt: { top: 15, left: 15 },
+                helper: function() {
+                    const clone = $(this).clone().css({
+                        width: $(this).width(),
+                        height: 'auto'
+                    });
+                    return clone;
+                },
                 start: function(event, ui) {
                     $(this).addClass('dragging');
                 },
@@ -489,8 +569,14 @@ function generate_scheduled_posts_calendar_alpha() {
                 drop: function(event, ui) {
                     const postId = ui.draggable.data('post-id');
                     const newDate = $(this).data('date');
+                    const oldDate = new Date(ui.draggable.closest('.calendar-day').data('date'));
+                    const newDateTime = new Date(newDate);
                     
-                    // Mise à jour de la date de publication via l'API REST
+                    // Conserver l'heure de l'article original
+                    newDateTime.setHours(oldDate.getHours());
+                    newDateTime.setMinutes(oldDate.getMinutes());
+
+                    // Mise à jour via l'API REST
                     fetch(`<?php echo esc_url(rest_url('wp/v2/posts/')); ?>${postId}`, {
                         method: 'POST',
                         headers: {
@@ -498,12 +584,11 @@ function generate_scheduled_posts_calendar_alpha() {
                             'X-WP-Nonce': '<?php echo wp_create_nonce('wp_rest'); ?>'
                         },
                         body: JSON.stringify({
-                            date: newDate
+                            date: newDateTime.toISOString()
                         })
                     })
                     .then(response => response.json())
                     .then(post => {
-                        // Rafraîchir le calendrier
                         updateCalendar(currentDate);
                     })
                     .catch(error => {
