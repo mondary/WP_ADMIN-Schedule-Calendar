@@ -21,6 +21,7 @@
  * v2.7 "Le Navigateur" - Ajout du raccourci dans la barre d'administration
  * v2.8 "Le Simplificateur" - Suppression du drag & drop et réorganisation des tuiles
  * v2.9 "L'Organisateur" - Refonte du header avec sélection directe des dates
+ * v3.0 "L'Iconographe" - Amélioration des icônes et réorganisation des statistiques
  */
 
 // Assurez-vous que le script ne peut être exécuté que dans WordPress
@@ -76,6 +77,14 @@ function scheduled_posts_calendar_styles_alpha() {
             border-radius: 4px;
             cursor: pointer;
             font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .calendar-nav button .dashicons {
+            font-size: 16px;
+            width: 16px;
+            height: 16px;
         }
         .calendar-nav button:hover {
             background: #f0f0f1;
@@ -393,7 +402,7 @@ function generate_scheduled_posts_calendar_alpha() {
                     <input type="text" id="searchPosts" placeholder="Rechercher des articles...">
                 </div>
                 <div class="calendar-nav">
-                    <button id="prevMonth">&lt;</button>
+                    <button id="prevMonth"><span class="dashicons dashicons-arrow-left-alt2"></span></button>
                     <select id="monthSelect">
                         <?php
                         $months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
@@ -411,7 +420,7 @@ function generate_scheduled_posts_calendar_alpha() {
                         }
                         ?>
                     </select>
-                    <button id="nextMonth">&gt;</button>
+                    <button id="nextMonth"><span class="dashicons dashicons-arrow-right-alt2"></span></button>
                 </div>
                 <select id="categoryFilter">
                     <option value="">Toutes les catégories</option>
@@ -423,9 +432,9 @@ function generate_scheduled_posts_calendar_alpha() {
                     ?>
                 </select>
                 <div class="calendar-stats">
-                    <span title="Articles du mois"><i class="dashicons dashicons-calendar"></i> <span id="totalMonthPosts" class="count">0</span></span>
-                    <span title="Moyenne mensuelle"><i class="dashicons dashicons-chart-bar"></i> <span id="avgPostsPerMonth" class="count">0</span></span>
-                    <span title="Total de l'année"><i class="dashicons dashicons-calendar-alt"></i> <span id="totalYearPosts" class="count">0</span></span>
+                    <span title="Total des articles de l'année"><i class="dashicons dashicons-archive"></i> <span id="totalYearPosts" class="count">0</span></span>
+                    <span title="Articles du mois en cours"><i class="dashicons dashicons-portfolio"></i> <span id="totalMonthPosts" class="count">0</span></span>
+                    <span title="Moyenne mensuelle"><i class="dashicons dashicons-chart-area"></i> <span id="avgPostsPerMonth" class="count">0</span></span>
                 </div>
             </div>
             <div class="calendar-grid" id="calendarGrid" data-jetpack-boost="ignore">
